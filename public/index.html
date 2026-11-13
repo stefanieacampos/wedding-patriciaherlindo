@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fernanda &amp; Pedro — Nosso Casamento</title>
+<meta name="description" content="Celebre conosco o dia mais especial das nossas vidas.">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Great+Vibes&family=Jost:wght@200;300;400;500&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
+
+<!-- Mercado Pago SDK -->
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+
+<style>
+/* ════════════════════════════════════════════
+   DESIGN SYSTEM
+════════════════════════════════════════════ */
+:root{
+  --pine:#2D4A38;--pine-dk:#1A2E22;--pine-lt:#3D6350;
+  --gold:#C9A84C;--gold-lt:#E2C97A;--gold-dk:#9A7A28;
+  --sage:#7A9E7E;--cream:#F5F0E8;--cream-dk:#EDE7D9;
+  --text:#1A1A1A;--text-lt:#4A4A4A;
+  --font-s:'Cormorant Garamond',Georgia,serif;
+  --font-b:'Jost','Helvetica Neue',sans-serif;
+  --font-d:'Great Vibes',cursive;
+}
+
+*,::before,::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--cream);color:var(--text);font-family:var(--font-b);font-weight:300;line-height:1.6;overflow-x:hidden}
+img{max-width:100%;height:auto;display:block}
+
+/* ── Typography ─────────────────────────────── */
+h1,h2,h3{font-family:var(--font-s);font-weight:400;line-height:1.15}
+.script{font-family:var(--font-d);font-weight:400}
+.caps{text-transform:uppercase;letter-spacing:.18em;font-size:.72rem;font-family:var(--font-b);font-weight:400}
+.gold{color:var(--gold)}
+
+/* ── Layout ─────────────────────────────────── */
+section{padding:5rem 1.5rem}
+.container{max-width:900px;margin:0 auto}
+.text-center{text-align:center}
+hr.ornament{border:none;text-align:center;color:var(--gold);margin:2rem auto;width:200px;border-top:1px solid rgba(201,168,76,.4)}
+
+/* ── Buttons ─────────────────────────────────── */
+.btn{display:inline-block;padding:.85rem 2.2rem;border-radius:2px;border:none;cursor:pointer;font-family:var(--font-b);font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;text-decoration:none;transition:all .25s}
+.btn-gold{background:var(--gold);color:#050C07;font-weight:500}
+.btn-gold:hover{background:var(--gold-lt)}
+.btn-outline{background:transparent;color:var(--pine);border:1px solid var(--pine)}
+.btn-outline:hover{background:var(--pine);color:var(--cream)}
+
+/* ════════════════════════════════════════════
+   HERO
+════════════════════════════════════════════ */
+#hero{
+  min-height:100svh;
+  background:linear-gradient(to bottom,var(--pine-dk) 0%,var(--pine) 60%,#1f3828 100%);
+  display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:3rem 1.5rem;position:relative;overflow:hidden
+}
+#hero::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 20%,rgba(201,168,76,.12) 0%,transparent 65%);
+  pointer-events:none
+}
+.hero-inner{position:relative;z-index:1}
+.hero-script{font-size:clamp(3.5rem,10vw,7rem);color:var(--gold-lt);display:block;margin-bottom:.5rem;line-height:1}
+.hero-amp{font-size:clamp(2.5rem,7vw,5rem);color:rgba(201,168,76,.5);font-family:var(--font-d);line-height:1}
+.hero-date{color:rgba(245,240,232,.6);font-size:.75rem;letter-spacing:.22em;text-transform:uppercase;margin-top:2rem}
+.hero-countdown{display:flex;gap:1.5rem;justify-content:center;margin-top:2rem;flex-wrap:wrap}
+.cd-unit{text-align:center}
+.cd-num{font-family:var(--font-s);font-size:2.5rem;color:var(--gold-lt);display:block;line-height:1}
+.cd-label{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(245,240,232,.45);margin-top:.3rem}
+.hero-scroll{position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);color:rgba(201,168,76,.5);animation:bounce 2s infinite}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-6px)}}
+
+/* ════════════════════════════════════════════
+   NAV
+════════════════════════════════════════════ */
+nav{
+  position:sticky;top:0;z-index:100;
+  background:rgba(26,46,34,.95);backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid rgba(201,168,76,.15);
+  padding:.9rem 1.5rem
+}
+.nav-inner{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem}
+.nav-brand{font-family:var(--font-d);font-size:1.6rem;color:var(--gold-lt);text-decoration:none}
+.nav-links{display:flex;gap:1.6rem;list-style:none;flex-wrap:wrap}
+.nav-links a{color:rgba(245,240,232,.65);text-decoration:none;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;transition:color .2s}
+.nav-links a:hover{color:var(--gold-lt)}
+
+/* ════════════════════════════════════════════
+   CASAL
+════════════════════════════════════════════ */
+#casal{background:var(--cream)}
+#casal .couple-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:3rem}
+.couple-card{text-align:center;padding:2rem}
+.couple-photo{width:160px;height:160px;border-radius:50%;object-fit:cover;margin:0 auto 1.3rem;border:3px solid var(--gold)}
+.couple-name{font-family:var(--font-s);font-size:1.6rem;color:var(--pine-dk);margin-bottom:.4rem}
+.couple-bio{color:var(--text-lt);font-size:.85rem;line-height:1.7}
+
+/* ════════════════════════════════════════════
+   EVENTO
+════════════════════════════════════════════ */
+#evento{background:var(--pine-dk);color:var(--cream)}
+#evento h2{color:var(--gold-lt)}
+.event-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;margin-top:3rem}
+.event-card{background:rgba(255,255,255,.04);border:1px solid rgba(201,168,76,.2);padding:1.8rem 1.5rem;text-align:center;border-radius:2px}
+.event-icon{font-size:1.8rem;margin-bottom:.8rem}
+.event-label{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--sage);margin-bottom:.4rem}
+.event-value{font-family:var(--font-s);font-size:1.1rem}
+.event-value a{color:var(--gold-lt);text-decoration:none}
+.event-value a:hover{text-decoration:underline}
+
+/* ════════════════════════════════════════════
+   CARTAS
+════════════════════════════════════════════ */
+#cartas{background:var(--cream-dk)}
+.letter-grid{display:flex;flex-wrap:wrap;gap:.8rem;justify-content:center;margin-top:2.5rem}
+.letter-btn{
+  background:var(--pine);color:var(--cream);border:none;
+  padding:.75rem 1.6rem;font-family:var(--font-b);font-size:.7rem;
+  letter-spacing:.12em;text-transform:uppercase;cursor:pointer;
+  border-radius:2px;transition:all .22s
+}
+.letter-btn:hover{background:var(--pine-lt);transform:translateY(-1px)}
+
+/* ── Modal ──────────────────────────────────── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;
+  display:flex;align-items:center;justify-content:center;padding:1.5rem;
+  opacity:0;pointer-events:none;transition:opacity .25s
+}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-box{
+  background:var(--cream);max-width:600px;width:100%;max-height:85vh;
+  overflow-y:auto;padding:2.5rem;position:relative;border-radius:3px;
+  transform:translateY(20px);transition:transform .25s
+}
+.modal-overlay.open .modal-box{transform:translateY(0)}
+.modal-close{
+  position:absolute;top:1rem;right:1.2rem;background:none;border:none;
+  font-size:1.4rem;cursor:pointer;color:var(--text-lt)
+}
+#msgTo{font-family:var(--font-d);font-size:2rem;color:var(--pine);margin-bottom:1rem;display:block}
+#msgBody{font-family:var(--font-s);font-size:1.05rem;line-height:1.9;color:var(--text);white-space:pre-line}
+
+/* ════════════════════════════════════════════
+   CONFIRMAÇÃO DE PRESENÇA
+════════════════════════════════════════════ */
+#confirmacao{background:var(--pine);color:var(--cream)}
+#confirmacao h2{color:var(--gold-lt)}
+#confirmacao p{color:rgba(245,240,232,.75)}
+.rsvp-form{max-width:480px;margin:2.5rem auto 0;display:flex;flex-direction:column;gap:1.1rem}
+.form-group{display:flex;flex-direction:column;gap:.4rem}
+.form-group label{font-size:.65rem;letter-spacing:.14em;text-transform:uppercase;color:var(--sage)}
+.form-group input,.form-group textarea,.form-group select{
+  background:rgba(255,255,255,.08);border:1px solid rgba(201,168,76,.25);
+  color:var(--cream);padding:.75rem 1rem;font-family:var(--font-b);font-size:.9rem;
+  border-radius:2px;outline:none;transition:border-color .2s
+}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--gold)}
+.form-group textarea{resize:vertical;min-height:90px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.rsvp-msg{margin-top:1rem;padding:.9rem;border-radius:2px;font-size:.85rem;text-align:center;display:none}
+.rsvp-msg.ok{background:rgba(130,212,148,.15);border:1px solid #82D494;color:#82D494;display:block}
+.rsvp-msg.err{background:rgba(255,100,100,.1);border:1px solid #F47;color:#faa;display:block}
+
+/* ════════════════════════════════════════════
+   PRESENTES / MERCADO PAGO
+════════════════════════════════════════════ */
+#presentes{background:var(--cream)}
+.gift-intro{max-width:580px;margin:1.5rem auto 0;text-align:center;color:var(--text-lt);font-size:.95rem;line-height:1.8}
+.gift-pix{background:var(--cream-dk);border:1px solid rgba(201,168,76,.3);padding:1.5rem 2rem;border-radius:3px;text-align:center;max-width:380px;margin:2rem auto}
+.gift-pix-label{font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;color:var(--pine);margin-bottom:.5rem}
+.gift-pix-key{font-family:'Courier New',monospace;font-size:1rem;color:var(--pine-dk);word-break:break-all;cursor:pointer;transition:color .2s}
+.gift-pix-key:hover{color:var(--gold-dk)}
+.pix-copied{font-size:.7rem;color:var(--sage);margin-top:.4rem;height:1em;transition:opacity .3s}
+
+/* Formulário MP */
+.mp-form{max-width:480px;margin:2.5rem auto 0;display:flex;flex-direction:column;gap:1rem}
+.mp-amount-presets{display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:.3rem}
+.mp-preset{background:var(--cream-dk);border:1px solid rgba(201,168,76,.4);color:var(--pine-dk);padding:.4rem .9rem;border-radius:2px;cursor:pointer;font-size:.78rem;font-family:var(--font-b);transition:all .2s}
+.mp-preset:hover,.mp-preset.on{background:var(--pine);color:var(--cream);border-color:var(--pine)}
+#mp-brick-container{min-height:60px}
+.mp-status{text-align:center;padding:1rem;border-radius:2px;display:none;font-size:.88rem}
+.mp-status.ok{background:rgba(130,212,148,.15);border:1px solid #82D494;color:#3a7a3a;display:block}
+.mp-status.err{background:rgba(255,100,100,.08);border:1px solid #F47;color:#a33;display:block}
+.mp-status.loading{background:rgba(201,168,76,.1);border:1px solid var(--gold);color:var(--pine-dk);display:block}
+
+/* ════════════════════════════════════════════
+   GALERIA
+════════════════════════════════════════════ */
+#galeria{background:var(--pine-dk)}
+#galeria h2{color:var(--gold-lt)}
+.gallery-grid{columns:3;column-gap:1rem;margin-top:2.5rem}
+.gallery-grid img{width:100%;margin-bottom:1rem;border-radius:2px;break-inside:avoid;transition:opacity .3s}
+.gallery-empty{color:rgba(245,240,232,.4);text-align:center;padding:3rem 0;font-style:italic}
+
+/* ════════════════════════════════════════════
+   FOOTER
+════════════════════════════════════════════ */
+footer{background:var(--pine-dk);color:rgba(245,240,232,.4);text-align:center;padding:2.5rem 1.5rem;font-size:.75rem;border-top:1px solid rgba(201,168,76,.1)}
+footer .script{color:var(--gold-lt);font-size:1.6rem;display:block;margin-bottom:.5rem}
+
+/* ════════════════════════════════════════════
+   RESPONSIVE
+════════════════════════════════════════════ */
+@media(max-width:600px){
+  #casal .couple-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .gallery-grid{columns:2}
+  .nav-links{gap:1rem}
+}
+@media(max-width:400px){
+  .gallery-grid{columns:1}
+}
+
+/* ── Utility ─────────────────────────────────── */
+.mt-2{margin-top:.5rem}.mt-4{margin-top:1rem}.mt-8{margin-top:2rem}
+.divider{height:1px;background:linear-gradient(to right,transparent,rgba(201,168,76,.4),transparent);margin:2.5rem 0}
+</style>
+</head>
+
+<body>
+
+<!-- ════ HERO ═══════════════════════════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-inner">
+    <span class="script hero-script" id="hero-name1">Fernanda</span>
+    <span class="hero-amp">&amp;</span>
+    <span class="script hero-script" id="hero-name2">Pedro</span>
+    <p class="hero-date" id="hero-date">· · · 14 de fevereiro de 2026 · · ·</p>
+    <div class="hero-countdown" id="countdown"></div>
+  </div>
+  <div class="hero-scroll">↓</div>
+</section>
+
+<!-- ════ NAV ════════════════════════════════════════════════════════════ -->
+<nav>
+  <div class="nav-inner">
+    <a href="#hero" class="nav-brand">F &amp; P</a>
+    <ul class="nav-links">
+      <li><a href="#casal">Nós</a></li>
+      <li><a href="#evento">O Dia</a></li>
+      <li><a href="#cartas">Cartas</a></li>
+      <li><a href="#confirmacao">Presença</a></li>
+      <li><a href="#presentes">Presentes</a></li>
+      <li><a href="#galeria">Galeria</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ════ CASAL ══════════════════════════════════════════════════════════ -->
+<section id="casal">
+  <div class="container text-center">
+    <p class="caps gold">Nossa história</p>
+    <h2 class="mt-2" style="font-size:2.2rem" id="sec-casal-title">Unidos pelo amor</h2>
+    <div class="divider"></div>
+    <div class="couple-grid">
+      <div class="couple-card">
+        <div class="couple-name script" style="font-size:2.2rem">Fernanda</div>
+        <p class="couple-bio" id="bio-noiva">Apaixonada por natureza, música e por fazer cada momento especial. Encontrou no Pedro a paz que sempre buscou.</p>
+      </div>
+      <div class="couple-card">
+        <div class="couple-name script" style="font-size:2.2rem">Pedro</div>
+        <p class="couple-bio" id="bio-noivo">Aventureiro e sonhador, encontrou em Fernanda a parceira para toda a vida. Juntos, escrevem a história mais bonita.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ EVENTO ═════════════════════════════════════════════════════════ -->
+<section id="evento">
+  <div class="container text-center">
+    <p class="caps" style="color:var(--sage)">O grande dia</p>
+    <h2 class="mt-2" style="font-size:2.2rem">Celebre conosco</h2>
+    <div class="event-cards">
+      <div class="event-card">
+        <div class="event-icon">📅</div>
+        <div class="event-label">Data</div>
+        <div class="event-value" id="ev-date">14 de Fevereiro de 2026</div>
+      </div>
+      <div class="event-card">
+        <div class="event-icon">🕕</div>
+        <div class="event-label">Horário</div>
+        <div class="event-value" id="ev-time">18h00</div>
+      </div>
+      <div class="event-card">
+        <div class="event-icon">📍</div>
+        <div class="event-label">Local</div>
+        <div class="event-value" id="ev-venue">Quinta das Flores<br><a href="#" id="ev-maps" target="_blank" rel="noopener">Ver no mapa ↗</a></div>
+      </div>
+      <div class="event-card">
+        <div class="event-icon">👔</div>
+        <div class="event-label">Traje</div>
+        <div class="event-value" id="ev-dress">Esporte Fino</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ CARTAS ═════════════════════════════════════════════════════════ -->
+<section id="cartas">
+  <div class="container text-center">
+    <p class="caps gold">Palavras do coração</p>
+    <h2 class="mt-2" style="font-size:2.2rem;color:var(--pine-dk)">Nossas cartas</h2>
+    <div class="letter-grid">
+      <button class="letter-btn" onclick="openMsg('convidados')">Aos Convidados</button>
+      <button class="letter-btn" onclick="openMsg('padrinhos')">Aos Padrinhos</button>
+      <button class="letter-btn" onclick="openMsg('irma')">À Irmã do Noivo</button>
+      <button class="letter-btn" onclick="openMsg('filhos')">Aos Filhos</button>
+      <button class="letter-btn" onclick="openMsg('netos')">Aos Netinhos</button>
+    </div>
+  </div>
+</section>
+
+<!-- Modal de cartas -->
+<div class="modal-overlay" id="msgModal" onclick="if(event.target===this)closeMsg()">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeMsg()">✕</button>
+    <span id="msgTo" class="script"></span>
+    <p id="msgBody"></p>
+  </div>
+</div>
+
+<!-- ════ CONFIRMAÇÃO DE PRESENÇA ════════════════════════════════════════ -->
+<section id="confirmacao">
+  <div class="container text-center">
+    <p class="caps" style="color:var(--sage)">RSVP</p>
+    <h2 class="mt-2" style="font-size:2.2rem">Confirme sua presença</h2>
+    <p class="mt-4">Por favor confirme até <strong id="rsvp-deadline">31 de Janeiro de 2026</strong>.</p>
+    <form class="rsvp-form" id="rsvpForm" onsubmit="submitRsvp(event)">
+      <div class="form-group">
+        <label>Seu nome completo</label>
+        <input type="text" id="f-name" required maxlength="100" placeholder="Nome e Sobrenome">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Adultos</label>
+          <input type="number" id="f-adults" min="1" max="10" value="1" required>
+        </div>
+        <div class="form-group">
+          <label>Crianças</label>
+          <input type="number" id="f-children" min="0" max="10" value="0" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Alguma mensagem? (opcional)</label>
+        <textarea id="f-message" maxlength="500" placeholder="Restrição alimentar, recado especial…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-gold" id="rsvp-btn">Confirmar Presença</button>
+      <div class="rsvp-msg" id="rsvpMsg"></div>
+    </form>
+  </div>
+</section>
+
+<!-- ════ PRESENTES ══════════════════════════════════════════════════════ -->
+<section id="presentes">
+  <div class="container text-center">
+    <p class="caps gold">Lista de presentes</p>
+    <h2 class="mt-2" style="font-size:2.2rem;color:var(--pine-dk)">Sua contribuição</h2>
+    <p class="gift-intro">O maior presente é a sua presença. Mas se quiser nos ajudar a construir nossos sonhos, qualquer contribuição será recebida com muito amor e gratidão.</p>
+
+    <!-- PIX -->
+    <div class="gift-pix">
+      <div class="gift-pix-label">PIX</div>
+      <div class="gift-pix-key" id="pixKey" onclick="copyPix()" title="Clique para copiar">
+        <!-- será preenchido via Firestore -->
+        carregando…
+      </div>
+      <div class="pix-copied" id="pixCopied"></div>
+    </div>
+
+    <!-- Separador -->
+    <div class="divider"></div>
+    <p class="caps" style="color:var(--pine);margin-bottom:1.5rem">Ou contribua com cartão</p>
+
+    <!-- Formulário Mercado Pago -->
+    <div class="mp-form" id="mpFormArea" style="display:none">
+      <div class="form-group">
+        <label style="color:var(--pine)">Seu nome</label>
+        <input type="text" id="mp-name" maxlength="80" placeholder="Como gostaria de ser identificado(a)" style="background:#fff;color:var(--text);border:1px solid rgba(45,74,56,.3)">
+      </div>
+      <div class="form-group">
+        <label style="color:var(--pine)">Mensagem (opcional)</label>
+        <textarea id="mp-message" maxlength="300" placeholder="Deixe um recado para os noivos…" style="background:#fff;color:var(--text);border:1px solid rgba(45,74,56,.3);min-height:70px;resize:vertical"></textarea>
+      </div>
+      <div class="form-group">
+        <label style="color:var(--pine)">Valor</label>
+        <div class="mp-amount-presets" id="presets">
+          <button type="button" class="mp-preset" data-val="50">R$ 50</button>
+          <button type="button" class="mp-preset" data-val="100">R$ 100</button>
+          <button type="button" class="mp-preset" data-val="200">R$ 200</button>
+          <button type="button" class="mp-preset" data-val="500">R$ 500</button>
+          <button type="button" class="mp-preset" data-val="outro">Outro</button>
+        </div>
+        <input type="number" id="mp-amount" min="10" max="50000" step="1" placeholder="R$ 0,00"
+               style="background:#fff;color:var(--text);border:1px solid rgba(45,74,56,.3);display:none">
+      </div>
+      <div id="mp-brick-container"></div>
+      <div class="mp-status" id="mpStatus"></div>
+    </div>
+    <button class="btn btn-outline mt-8" id="mpToggleBtn" onclick="toggleMpForm()">Contribuir com cartão</button>
+  </div>
+</section>
+
+<!-- ════ GALERIA ════════════════════════════════════════════════════════ -->
+<section id="galeria">
+  <div class="container text-center">
+    <p class="caps" style="color:var(--sage)">Memórias</p>
+    <h2 class="mt-2" style="font-size:2.2rem">Nossa galeria</h2>
+    <div class="gallery-grid" id="galleryGrid">
+      <p class="gallery-empty">As fotos serão adicionadas em breve ✨</p>
+    </div>
+  </div>
+</section>
+
+<!-- ════ FOOTER ═════════════════════════════════════════════════════════ -->
+<footer>
+  <span class="script">Fernanda &amp; Pedro</span>
+  <p>Com amor, 2026 · Todos os direitos reservados</p>
+</footer>
+
+<!-- ════════════════════════════════════════════════════════════════════
+   SCRIPTS
+════════════════════════════════════════════════════════════════════ -->
+<script>
+// ── Firebase config ─────────────────────────────────────────────────────
+// SUBSTITUA com suas credenciais reais do Console do Firebase
+const firebaseConfig = {
+  apiKey:            "AIzaSyAsZ7MPZFwYGblWjpA_s68lBVFoNRRozCQ",
+  authDomain:        "wedding-patriciaherlindo.firebaseapp.com",
+  projectId:         "wedding-patriciaherlindo",
+  storageBucket:     "wedding-patriciaherlindo.firebasestorage.app",
+  messagingSenderId: "705689076625",
+  appId:             "1:705689076625:web:3b91e5cceeb9ba52af9030"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db       = firebase.firestore();
+const storage  = firebase.storage();
+const functions = firebase.functions();
+
+// ── Cache de conteúdo dinâmico ──────────────────────────────────────────
+const _liveContent = {};
+
+// Defaults das cartas (fallback caso o Firestore não tenha)
+const _msgs = {
+  convidados:{to:'Aos nossos queridos convidados',body:'Cada um de vocês faz parte da nossa história e é com imensa alegria que os convidamos para compartilhar este momento tão especial. Sejam bem-vindos!'},
+  padrinhos: {to:'Aos nossos padrinhos amados',  body:'Vocês são muito mais do que padrinhos — são amigos que escolhemos para caminhar ao nosso lado. Obrigado por tornarem este dia ainda mais especial.'},
+  irma:      {to:'À irmã do noivo',              body:'Você sempre foi muito mais do que uma irmã — foi amiga, conselheira e parceira de vida. Que nossa família continue crescendo com tanto amor.'},
+  filhos:    {to:'Aos nossos filhos',             body:'Vocês são a razão pela qual queremos construir uma família ainda mais sólida. Este casamento é também por vocês, com todo o nosso amor.'},
+  netos:     {to:'Aos nossos netinhos',           body:'Vocês enchem nossas vidas de alegria e luz. Que esta celebração fique na memória de vocês como um dia de pura felicidade em família.'},
+};
+
+// Carrega conteúdo dinâmico do Firestore
+db.collection('content').onSnapshot(snap => {
+  snap.docs.forEach(doc => {
+    _liveContent[doc.id] = doc.data().value || '';
+  });
+  applyDynamicContent();
+});
+
+function applyDynamicContent() {
+  const fields = {
+    'ev_date':    el => { if(el) el.textContent = _liveContent['ev_date'] || el.textContent; },
+    'ev_time':    el => { if(el) el.textContent = _liveContent['ev_time'] || el.textContent; },
+    'ev_venue':   null, // tratado separado
+    'pix_key':    null, // tratado separado
+  };
+  // Atualiza chave PIX
+  const pixEl = document.getElementById('pixKey');
+  if(pixEl && _liveContent['pix_key']) pixEl.textContent = _liveContent['pix_key'];
+  // Data e hora
+  const dateEl = document.getElementById('ev-date');
+  if(dateEl && _liveContent['ev_date']) dateEl.textContent = _liveContent['ev_date'];
+  const timeEl = document.getElementById('ev-time');
+  if(timeEl && _liveContent['ev_time']) timeEl.textContent = _liveContent['ev_time'];
+  // Local + link mapa
+  if(_liveContent['ev_venue']) {
+    const v = document.getElementById('ev-venue');
+    if(v) {
+      const a = v.querySelector('a');
+      const link = a ? a.outerHTML : '';
+      v.innerHTML = _liveContent['ev_venue'].replace(/\n/g,'<br>') + (link ? '<br>' + link : '');
+    }
+  }
+  if(_liveContent['ev_maps_url']) {
+    const a = document.getElementById('ev-maps');
+    if(a) a.href = _liveContent['ev_maps_url'];
+  }
+  // Data limite RSVP
+  if(_liveContent['rsvp_deadline']) {
+    const el = document.getElementById('rsvp-deadline');
+    if(el) el.textContent = _liveContent['rsvp_deadline'];
+  }
+}
+
+// ── Cartas / Modal ──────────────────────────────────────────────────────
+function openMsg(key) {
+  const lc = _liveContent;
+  const m  = _msgs[key];
+  document.getElementById('msgTo').textContent   = lc['carta_to_'+key] || m.to;
+  document.getElementById('msgBody').textContent = lc['carta_'+key]    || m.body;
+  document.getElementById('msgModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeMsg() {
+  document.getElementById('msgModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeMsg(); });
+
+// ── PIX ─────────────────────────────────────────────────────────────────
+function copyPix() {
+  const key = document.getElementById('pixKey').textContent.trim();
+  navigator.clipboard.writeText(key).then(() => {
+    const el = document.getElementById('pixCopied');
+    el.textContent = '✓ Copiado!';
+    setTimeout(()=>{ el.textContent=''; }, 2500);
+  });
+}
+
+// ── Contagem regressiva ──────────────────────────────────────────────────
+(function countdown() {
+  const wedding = new Date('2026-02-14T18:00:00-03:00');
+  function update() {
+    const now  = new Date();
+    const diff = wedding - now;
+    if(diff <= 0){
+      document.getElementById('countdown').innerHTML = '<span style="color:var(--gold-lt);font-family:var(--font-d);font-size:1.6rem">O grande dia chegou! 🎉</span>';
+      return;
+    }
+    const d = Math.floor(diff/864e5);
+    const h = Math.floor((diff%864e5)/36e5);
+    const m = Math.floor((diff%36e5)/6e4);
+    const s = Math.floor((diff%6e4)/1e3);
+    document.getElementById('countdown').innerHTML =
+      `<div class="cd-unit"><span class="cd-num">${d}</span><span class="cd-label">Dias</span></div>`+
+      `<div class="cd-unit"><span class="cd-num">${String(h).padStart(2,'0')}</span><span class="cd-label">Horas</span></div>`+
+      `<div class="cd-unit"><span class="cd-num">${String(m).padStart(2,'0')}</span><span class="cd-label">Min</span></div>`+
+      `<div class="cd-unit"><span class="cd-num">${String(s).padStart(2,'0')}</span><span class="cd-label">Seg</span></div>`;
+  }
+  update();
+  setInterval(update, 1000);
+})();
+
+// ── RSVP ─────────────────────────────────────────────────────────────────
+async function submitRsvp(e) {
+  e.preventDefault();
+  const btn = document.getElementById('rsvp-btn');
+  const msg = document.getElementById('rsvpMsg');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+  msg.className = 'rsvp-msg';
+
+  const name     = document.getElementById('f-name').value.trim();
+  const adults   = parseInt(document.getElementById('f-adults').value) || 1;
+  const children = parseInt(document.getElementById('f-children').value) || 0;
+  const message  = document.getElementById('f-message').value.trim();
+
+  // Validações básicas no cliente
+  if(!name || name.length < 2) {
+    showRsvpMsg('Por favor, insira seu nome.', 'err');
+    btn.disabled = false; btn.textContent = 'Confirmar Presença'; return;
+  }
+
+  try {
+    await db.collection('rsvps').add({
+      name, adults, children, message,
+      createdAt: Date.now()
+    });
+    showRsvpMsg('Presença confirmada! Que alegria, te esperamos! 🎉', 'ok');
+    document.getElementById('rsvpForm').reset();
+  } catch(err) {
+    console.error('RSVP error:', err);
+    showRsvpMsg('Algo deu errado. Tente novamente.', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Confirmar Presença';
+  }
+}
+function showRsvpMsg(text, type) {
+  const el = document.getElementById('rsvpMsg');
+  el.textContent = text;
+  el.className = 'rsvp-msg ' + type;
+}
+
+// ── Galeria ──────────────────────────────────────────────────────────────
+db.collection('photos').onSnapshot(snap => {
+  const grid = document.getElementById('galleryGrid');
+  if(snap.empty) {
+    grid.innerHTML = '<p class="gallery-empty">As fotos serão adicionadas em breve ✨</p>';
+    return;
+  }
+  grid.innerHTML = snap.docs.map(doc => {
+    const d = doc.data();
+    return `<img src="${d.url}" alt="${d.caption||'Foto'}" loading="lazy">`;
+  }).join('');
+});
+
+// ── Mercado Pago Bricks ──────────────────────────────────────────────────
+let mpInstance = null;
+let selectedAmount = null;
+let brickController = null;
+
+// Sua Public Key do Mercado Pago (NÃO é o access token)
+const MP_PUBLIC_KEY = 'COLE_SUA_PUBLIC_KEY_MP';
+
+function toggleMpForm() {
+  const area = document.getElementById('mpFormArea');
+  const btn  = document.getElementById('mpToggleBtn');
+  if(area.style.display === 'none') {
+    area.style.display = 'flex';
+    btn.textContent = 'Fechar';
+    if(!mpInstance) mpInstance = new MercadoPago(MP_PUBLIC_KEY, { locale: 'pt-BR' });
+  } else {
+    area.style.display = 'none';
+    btn.textContent = 'Contribuir com cartão';
+  }
+}
+
+// Presets de valor
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.mp-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mp-preset').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      const val = btn.dataset.val;
+      const customInput = document.getElementById('mp-amount');
+      if(val === 'outro') {
+        customInput.style.display = 'block';
+        customInput.focus();
+        selectedAmount = null;
+      } else {
+        customInput.style.display = 'none';
+        selectedAmount = parseFloat(val);
+        renderBrick(selectedAmount);
+      }
+    });
+  });
+  document.getElementById('mp-amount').addEventListener('change', e => {
+    const v = parseFloat(e.target.value);
+    if(v >= 10) { selectedAmount = v; renderBrick(v); }
+  });
+
+  // Verifica retorno de pagamento
+  const params = new URLSearchParams(location.search);
+  const pg = params.get('pagamento');
+  if(pg === 'sucesso') {
+    alert('🎉 Pagamento recebido! Muito obrigado pelo carinho!');
+    history.replaceState({}, '', location.pathname);
+  } else if(pg === 'erro') {
+    alert('Algo deu errado com o pagamento. Tente novamente ou use o PIX.');
+    history.replaceState({}, '', location.pathname);
+  }
+});
+
+async function renderBrick(amount) {
+  const statusEl = document.getElementById('mpStatus');
+  const container = document.getElementById('mp-brick-container');
+
+  // Destrói brick anterior
+  if(brickController) { await brickController.unmount(); brickController = null; }
+  container.innerHTML = '';
+
+  const name    = document.getElementById('mp-name').value.trim() || 'Convidado';
+  const message = document.getElementById('mp-message').value.trim();
+
+  statusEl.className = 'mp-status loading';
+  statusEl.textContent = 'Preparando pagamento…';
+
+  try {
+    const createPreference = functions.httpsCallable('createPreference');
+    const result = await createPreference({ amount, name, message });
+    const { id: preferenceId } = result.data;
+
+    statusEl.className = 'mp-status';
+
+    brickController = await mpInstance.bricks().create('wallet', 'mp-brick-container', {
+      initialization: { preferenceId },
+      customization: {
+        texts: { valueProp: 'smart_option' },
+      },
+    });
+  } catch(err) {
+    console.error('MP Brick error:', err);
+    statusEl.className = 'mp-status err';
+    statusEl.textContent = 'Não foi possível carregar o pagamento. Tente o PIX ou recarregue a página.';
+  }
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,86 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    // Usuário autenticado com custom claim admin=true
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.token.admin == true;
+    }
+
+    // Validação básica de string limpa
+    function safeStr(val, maxLen) {
+      return val is string
+          && val.size() > 0
+          && val.size() <= maxLen;
+    }
+
+    // ── /rsvps ───────────────────────────────────────────────────────────────
+    // Convidados podem CRIAR (sem login), admin pode tudo
+    match /rsvps/{id} {
+      allow read:   if isAdmin();
+      allow delete: if isAdmin();
+      allow update: if isAdmin();
+
+      allow create: if
+        // campos permitidos exatamente
+        request.resource.data.keys().hasAll(['name','adults','children','message','createdAt']) &&
+        request.resource.data.keys().hasOnly(['name','adults','children','message','createdAt']) &&
+        // nome: 2–100 chars
+        safeStr(request.resource.data.name, 100) &&
+        request.resource.data.name.size() >= 2 &&
+        // adultos: 1–30
+        request.resource.data.adults is number &&
+        request.resource.data.adults >= 1 &&
+        request.resource.data.adults <= 30 &&
+        // crianças: 0–30
+        request.resource.data.children is number &&
+        request.resource.data.children >= 0 &&
+        request.resource.data.children <= 30 &&
+        // mensagem: string até 500
+        request.resource.data.message is string &&
+        request.resource.data.message.size() <= 500 &&
+        // timestamp deve ser "agora" (tolerância ±60s)
+        request.resource.data.createdAt is number &&
+        request.resource.data.createdAt > (request.time.toMillis() - 60000) &&
+        request.resource.data.createdAt < (request.time.toMillis() + 10000);
+    }
+
+    // ── /content ─────────────────────────────────────────────────────────────
+    // Leitura pública (data evento, PIX, cartas…), escrita só admin
+    match /content/{id} {
+      allow read:  if true;
+      allow write: if isAdmin();
+    }
+
+    // ── /photos ──────────────────────────────────────────────────────────────
+    // Leitura pública, escrita só admin
+    match /photos/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ── /expenses ────────────────────────────────────────────────────────────
+    // Apenas admin
+    match /expenses/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── /payments ────────────────────────────────────────────────────────────
+    // Admin SDK (Cloud Functions) escreve via bypass de regras.
+    // Leitura apenas admin.
+    // allow write: if false — garante que nenhum cliente grave diretamente.
+    match /payments/{id} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
+    // ── Negação padrão ───────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
