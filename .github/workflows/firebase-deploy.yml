@@ -3,36 +3,25 @@ name: Deploy para Firebase
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # permite rodar manualmente pelo GitHub
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout código
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: functions/package-lock.json
 
       - name: Instalar dependências das Functions
         run: cd functions && npm ci
 
-      - name: Deploy no Firebase
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Autenticar no Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: wedding-patriciaherlindo
-          channelId: live
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
 
-      - name: Deploy Firestore Rules e Functions
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only firestore,storage,functions
-        env:
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy completo no Firebase
+        run: npx firebase-tools deploy --non-interactive --project wedding-patriciaherlindo
