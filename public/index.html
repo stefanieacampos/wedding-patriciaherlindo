@@ -1194,7 +1194,7 @@ function showLogin(){
 
 /* ---- DASHBOARD ---- */
 async function showDashboard(){
-  const sess=getSess();
+  const sess=_auth.currentUser;
   const now=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const navItems=[
     {id:'overview',label:'Visão Geral',
