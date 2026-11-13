@@ -1155,13 +1155,14 @@ async function initAdmin(){
   if(!db){renderPanel('<div class="adm-login"><div class="adm-login-box"><div class="adm-logo">Patricia &amp; Herlindo</div><div class="adm-logo-sub">Painel de Controle</div><p style="color:var(--sage);font-size:.82rem;text-align:center;line-height:1.8">Banco de dados indisponível.<br>Verifique sua conexão.</p></div></div>');return;}
   const sess=getSess();if(sess){showDashboard();return;}
   const cfg=await db.collection('admin').doc('config').get().catch(()=>null);
-  if(!cfg||!cfg.exists)showSetup();
+  const users=cfg&&cfg.exists?(cfg.data().users||[]):[];
+  if(users.length===0)showSetup();
   else showLogin();
 }
 
 function renderPanel(html){document.getElementById('adminPanel').innerHTML=html;}
 
-/* ---- SETUP ---- */
+/* ---- SETUP (primeiro acesso) ---- */
 function showSetup(){
   renderPanel(`<div class="adm-login"><div class="adm-login-box">
     <div class="adm-logo">Patricia &amp; Herlindo</div>
@@ -1179,8 +1180,10 @@ function showSetup(){
     if(pw.length<6){err.textContent='Senha mínima: 6 caracteres.';return;}
     err.textContent='Criando…';
     const hash=await hashPwd(pw);
-    await db.collection('admin').doc('config').set({email:em,passwordHash:hash});
-    setSess(em);showDashboard();
+    try{
+      await db.collection('admin').doc('config').set({users:[{email:em,passwordHash:hash,createdAt:Date.now()}]});
+      setSess(em);showDashboard();
+    }catch(e){err.textContent='Erro ao salvar: '+e.message;}
   });
 }
 
@@ -1200,8 +1203,10 @@ function showLogin(){
     err.textContent='Verificando…';
     const cfg=await db.collection('admin').doc('config').get().catch(()=>null);
     if(!cfg||!cfg.exists){err.textContent='Conta não configurada.';return;}
-    const d=cfg.data(),hash=await hashPwd(pw);
-    if(d.email!==em||d.passwordHash!==hash){err.textContent='E-mail ou senha incorretos.';return;}
+    const users=cfg.data().users||[];
+    const hash=await hashPwd(pw);
+    const match=users.find(u=>u.email===em&&u.passwordHash===hash);
+    if(!match){err.textContent='E-mail ou senha incorretos.';return;}
     setSess(em);showDashboard();
   };
   document.getElementById('lg-btn').addEventListener('click',go);
@@ -1225,8 +1230,10 @@ async function showDashboard(){
      icon:'<svg class="adm-nav-icon" viewBox="0 0 20 20"><path d="M13 3l4 4-9 9H4v-4L13 3z"/><path d="M11.5 4.5l4 4"/></svg>'},
     {id:'expenses',label:'Gastos',
      icon:'<svg class="adm-nav-icon" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><path d="M10 6v8M8 8.5h3.5a1.5 1.5 0 010 3H8"/></svg>'},
+    {id:'users',label:'Usuários',
+     icon:'<svg class="adm-nav-icon" viewBox="0 0 20 20"><circle cx="10" cy="7" r="3"/><path d="M4 18c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15 3l2 2-4 4"/><path d="M15 9V3h-2"/></svg>'},
   ];
-  const pageTitles={overview:'Visão Geral',guests:'Confirmações de Presença',photos:'Galeria de Fotos',letters:'Cartas dos Noivos',content:'Editar Conteúdo',expenses:'Controle de Gastos'};
+  const pageTitles={overview:'Visão Geral',guests:'Confirmações de Presença',photos:'Galeria de Fotos',letters:'Cartas dos Noivos',content:'Editar Conteúdo',expenses:'Controle de Gastos',users:'Gerenciar Usuários Admin'};
   renderPanel(`<div class="adm-shell">
     <aside class="adm-sidebar">
       <div class="adm-sidebar-brand">
@@ -1262,6 +1269,7 @@ async function showDashboard(){
         <div class="adm-pane" id="pane-letters"></div>
         <div class="adm-pane" id="pane-content"></div>
         <div class="adm-pane" id="pane-expenses"></div>
+        <div class="adm-pane" id="pane-users"></div>
       </div>
     </div>
   </div>`);
@@ -1281,7 +1289,7 @@ async function showDashboard(){
       document.getElementById('adm-page-title').textContent=pageTitles[tab]||'';
     });
   });
-  loadOverview();loadGuests();loadPhotos();loadLetters();loadContent();loadExpenses();
+  loadOverview();loadGuests();loadPhotos();loadLetters();loadContent();loadExpenses();loadUsers();
 }
 
 /* ---- TAB: VISÃO GERAL ---- */
@@ -1620,6 +1628,71 @@ function loadExpenses(){
       });
     });
   });
+}
+
+/* ---- TAB: USUÁRIOS ADMIN ---- */
+function loadUsers(){
+  const pane=document.getElementById('pane-users');
+  if(!pane)return;
+  async function render(){
+    const cfg=await db.collection('admin').doc('config').get().catch(()=>null);
+    const users=(cfg&&cfg.exists?cfg.data().users:[])||[];
+    pane.innerHTML=`
+      <div style="max-width:600px">
+        <div class="adm-card" style="margin-bottom:1.5rem">
+          <div class="adm-card-hd">Usuários com acesso ao painel (${users.length})</div>
+          ${users.length===0?'<p style="color:var(--sage);font-size:.82rem">Nenhum usuário cadastrado.</p>':''}
+          ${users.map((u,i)=>`
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:.7rem 0;border-bottom:1px solid rgba(201,168,76,.08)">
+              <div>
+                <div style="color:var(--cream);font-size:.82rem">${esc(u.email)}</div>
+                <div style="color:var(--sage);font-size:.6rem;letter-spacing:.08em;margin-top:.2rem">Cadastrado em ${u.createdAt?new Date(u.createdAt).toLocaleDateString('pt-BR'):'-'}</div>
+              </div>
+              ${users.length>1?`<button class="adm-btn-sm adm-btn" data-rm="${i}" style="background:rgba(220,50,50,.15);color:#ff6b6b;border:1px solid rgba(220,50,50,.3)">Remover</button>`:'<span style="font-size:.58rem;color:var(--sage);opacity:.5">único admin</span>'}
+            </div>`).join('')}
+        </div>
+        <div class="adm-card">
+          <div class="adm-card-hd">Adicionar novo usuário</div>
+          <div class="adm-field"><label class="adm-label">E-mail</label><input class="adm-input" id="nu-em" type="email" placeholder="email@exemplo.com"></div>
+          <div class="adm-field"><label class="adm-label">Senha</label><input class="adm-input" id="nu-pw" type="password" placeholder="Mínimo 6 caracteres"></div>
+          <div class="adm-field"><label class="adm-label">Confirme a senha</label><input class="adm-input" id="nu-pw2" type="password" placeholder="Repita a senha"></div>
+          <div class="adm-err" id="nu-err" style="margin-bottom:.8rem"></div>
+          <button class="adm-btn" id="nu-btn">Adicionar usuário</button>
+        </div>
+      </div>`;
+    // Remover usuário
+    pane.querySelectorAll('[data-rm]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const idx=+btn.dataset.rm;
+        const updated=users.filter((_,i)=>i!==idx);
+        await db.collection('admin').doc('config').update({users:updated}).catch(e=>alert('Erro: '+e.message));
+        render();
+      });
+    });
+    // Adicionar usuário
+    document.getElementById('nu-btn').addEventListener('click',async()=>{
+      const em=document.getElementById('nu-em').value.trim();
+      const pw=document.getElementById('nu-pw').value;
+      const pw2=document.getElementById('nu-pw2').value;
+      const err=document.getElementById('nu-err');
+      if(!em||!pw){err.textContent='Preencha todos os campos.';return;}
+      if(pw!==pw2){err.textContent='As senhas não conferem.';return;}
+      if(pw.length<6){err.textContent='Senha mínima: 6 caracteres.';return;}
+      if(users.find(u=>u.email===em)){err.textContent='Este e-mail já tem acesso.';return;}
+      err.textContent='Salvando…';
+      const hash=await hashPwd(pw);
+      const updated=[...users,{email:em,passwordHash:hash,createdAt:Date.now()}];
+      try{
+        await db.collection('admin').doc('config').update({users:updated});
+        document.getElementById('nu-em').value='';
+        document.getElementById('nu-pw').value='';
+        document.getElementById('nu-pw2').value='';
+        err.textContent='';
+        render();
+      }catch(e){err.textContent='Erro: '+e.message;}
+    });
+  }
+  render();
 }
 
 })();

@@ -85,7 +85,8 @@ service cloud.firestore {
     match /admin/config {
       allow read:   if true;
       allow create: if !exists(/databases/$(database)/documents/admin/config);
-      allow update, delete: if false;
+      allow update: if true;  // Necessário para adicionar/remover admins pelo painel
+      allow delete: if false;
     }
 
     // ── Negação padrão ───────────────────────────────────────────────────────
