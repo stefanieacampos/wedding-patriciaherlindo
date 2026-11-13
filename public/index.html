@@ -1282,8 +1282,8 @@ function loadOverview(){
     const tA=rs.reduce((a,r)=>a+(+r.adults||1),0);
     const tC=rs.reduce((a,r)=>a+(+r.children||0),0);
     const exps=state.expenses;
-    const total=exps.reduce((a,e)=>a+(+e.amount||0),0);
-    const paid=exps.filter(e=>e.paid).reduce((a,e)=>a+(+e.amount||0),0);
+    const total=exps.reduce((a,e)=>a+(+(e.totalAmount||e.amount)||0),0);
+    const paid=exps.reduce((a,e)=>{const t=+(e.totalAmount||e.amount||0);const p=e.paid?t:(e.payments||[]).reduce((s,x)=>s+(+x.amount||0),0);return a+p;},0);
     const paidPct=total>0?Math.round(paid/total*100):0;
     const recent=rs.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
     pane.innerHTML=`
@@ -1540,26 +1540,35 @@ function loadExpenses(){
   const pane=document.getElementById('pane-expenses');
   const cats=['Buffet','Bebidas','Decoração','Fotografia/Vídeo','Música/Som','Vestimenta','Local/Espaço','Convites','Outros'];
   if(!db){pane.innerHTML='<p style="color:var(--sage)">Indisponível.</p>';return;}
-  db.collection('expenses').onSnapshot(snap=>{
-    const exps=snap.docs.map(d=>({id:d.id,...d.data()}));
-    const total=exps.reduce((a,e)=>a+(+e.amount||0),0);
-    const paid=exps.filter(e=>e.paid).reduce((a,e)=>a+(+e.amount||0),0);
-    const pend=total-paid;
+  let expanded=null,lastExps=[];
+  function calcExp(e){
+    const totalAmount=+(e.totalAmount||e.amount||0);
+    const payments=e.payments||[];
+    const paidAmount=e.paid?totalAmount:payments.reduce((s,p)=>s+(+p.amount||0),0);
+    return{...e,totalAmount,payments,paidAmount,remaining:Math.max(0,totalAmount-paidAmount)};
+  }
+  function render(rawExps){
+    lastExps=rawExps;
+    const exps=rawExps.map(calcExp);
+    const totalBudget=exps.reduce((s,e)=>s+e.totalAmount,0);
+    const totalPaid=exps.reduce((s,e)=>s+e.paidAmount,0);
+    const totalRem=Math.max(0,totalBudget-totalPaid);
+    const pct=totalBudget>0?Math.min(100,Math.round(totalPaid/totalBudget*100)):0;
     const byCat={};cats.forEach(c=>{byCat[c]=0;});
-    exps.forEach(e=>{const c=e.category||'Outros';byCat[c]=(byCat[c]||0)+(+e.amount||0);});
+    exps.forEach(e=>{byCat[e.category||'Outros']=(byCat[e.category||'Outros']||0)+e.totalAmount;});
     const maxC=Math.max(...Object.values(byCat),1);
     pane.innerHTML=`
       <h2 class="adm-title">Controle de Gastos</h2>
-      <div class="adm-stat-row">
-        <div class="adm-stat"><div class="adm-stat-n">${fmt(total)}</div><div class="adm-stat-l">Total</div></div>
-        <div class="adm-stat"><div class="adm-stat-n" style="color:#7DC98A">${fmt(paid)}</div><div class="adm-stat-l">Pago</div></div>
-        <div class="adm-stat"><div class="adm-stat-n" style="color:#E07070">${fmt(pend)}</div><div class="adm-stat-l">A Pagar</div></div>
-        <div class="adm-stat"><div class="adm-stat-n">${exps.length}</div><div class="adm-stat-l">Itens</div></div>
+      <div class="adm-stat-row" style="margin-bottom:1rem">
+        <div class="adm-stat"><div class="adm-stat-n">${fmt(totalBudget)}</div><div class="adm-stat-l">Orçamento Total</div></div>
+        <div class="adm-stat"><div class="adm-stat-n" style="color:#7DC98A">${fmt(totalPaid)}</div><div class="adm-stat-l">Pago</div></div>
+        <div class="adm-stat"><div class="adm-stat-n" style="color:#E07070">${fmt(totalRem)}</div><div class="adm-stat-l">A Pagar</div></div>
+        <div class="adm-stat"><div class="adm-stat-n">${pct}%</div><div class="adm-stat-l">Quitado</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem" class="adm-row2">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem">
         <div class="adm-card">
           <div style="font-size:.52rem;letter-spacing:.14em;text-transform:uppercase;color:var(--sage);margin-bottom:1rem">Por categoria</div>
-          ${cats.filter(c=>byCat[c]>0).sort((a,b)=>byCat[b]-byCat[a]).slice(0,8).map(c=>`
+          ${cats.filter(c=>byCat[c]>0).sort((a,b)=>byCat[b]-byCat[a]).map(c=>`
             <div class="adm-chart-row">
               <span class="adm-chart-label">${c}</span>
               <div class="adm-chart-bar"><div class="adm-chart-fill" style="width:${Math.round(byCat[c]/maxC*100)}%"></div></div>
@@ -1571,41 +1580,104 @@ function loadExpenses(){
           <div class="adm-form">
             <div><label class="adm-label">Descrição</label><input class="adm-input" id="e-desc" placeholder="Ex: Contrato do buffet"></div>
             <div><label class="adm-label">Categoria</label><select class="adm-select" id="e-cat">${cats.map(c=>`<option>${c}</option>`).join('')}</select></div>
-            <div><label class="adm-label">Valor (R$)</label><input class="adm-input" id="e-amt" type="number" placeholder="0,00" min="0" step="0.01"></div>
-            <label style="display:flex;align-items:center;gap:.6rem;cursor:pointer"><input type="checkbox" id="e-paid" style="accent-color:var(--gold);width:14px;height:14px"><span style="font-size:.65rem;color:var(--sage);letter-spacing:.08em;text-transform:uppercase">Já pago</span></label>
+            <div><label class="adm-label">Valor total (R$)</label><input class="adm-input" id="e-amt" type="number" placeholder="0,00" min="0" step="0.01"></div>
             <button class="adm-btn" id="add-exp">+ Adicionar</button>
           </div>
         </div>
       </div>
-      ${exps.length>0?`<div class="adm-card" style="overflow-x:auto">
-        <table class="adm-table">
-          <thead><tr><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Status</th><th></th></tr></thead>
-          <tbody>${exps.sort((a,b)=>b.createdAt-a.createdAt).map(e=>`
-            <tr>
-              <td>${esc(e.description||'')}</td>
-              <td><span class="adm-badge adm-badge-y">${esc(e.category||'Outros')}</span></td>
-              <td style="color:var(--gold)">${fmt(e.amount)}</td>
-              <td><span class="adm-badge ${e.paid?'adm-badge-g':'adm-badge-r'}">${e.paid?'Pago':'A pagar'}</span></td>
-              <td><button class="adm-btn adm-btn-sm adm-btn-danger" data-del="${e.id}">✕</button></td>
-            </tr>`).join('')}</tbody>
-        </table>
-      </div>`:''}`;
+      ${exps.length>0?`<div class="adm-card" style="padding:0;overflow:hidden">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 90px 50px;gap:.8rem;padding:.6rem 1.2rem;border-bottom:1px solid rgba(201,168,76,.12)">
+          <div style="font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sage)">Descrição</div>
+          <div style="font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sage);text-align:right">Total</div>
+          <div style="font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sage);text-align:right">Pago</div>
+          <div style="font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sage);text-align:right">Restante</div>
+          <div style="font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sage);text-align:center">Progresso</div>
+          <div></div>
+        </div>
+        ${exps.sort((a,b)=>b.createdAt-a.createdAt).map(e=>{
+          const ePct=e.totalAmount>0?Math.min(100,Math.round(e.paidAmount/e.totalAmount*100)):0;
+          const isOpen=expanded===e.id;
+          return`<div class="exp-item" data-id="${e.id}" style="border-bottom:1px solid rgba(201,168,76,.06)">
+            <div class="exp-hdr" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 90px 50px;gap:.8rem;align-items:center;padding:.85rem 1.2rem;cursor:pointer">
+              <div>
+                <div style="color:var(--cream);font-size:.82rem;font-weight:500">${esc(e.description||'')}</div>
+                <span class="adm-badge adm-badge-y" style="margin-top:.25rem;display:inline-block">${esc(e.category||'Outros')}</span>
+              </div>
+              <div style="text-align:right;color:var(--gold);font-size:.8rem;font-weight:600">${fmt(e.totalAmount)}</div>
+              <div style="text-align:right;color:#7DC98A;font-size:.8rem;font-weight:600">${fmt(e.paidAmount)}</div>
+              <div style="text-align:right;color:${e.remaining>0?'#E07070':'#7DC98A'};font-size:.8rem;font-weight:600">${fmt(e.remaining)}</div>
+              <div>
+                <div style="background:rgba(255,255,255,.08);border-radius:4px;height:5px;overflow:hidden;margin-bottom:.2rem">
+                  <div style="background:${ePct>=100?'#7DC98A':'var(--gold)'};height:100%;width:${ePct}%"></div>
+                </div>
+                <div style="font-size:.55rem;color:var(--sage);text-align:center">${ePct}%</div>
+              </div>
+              <div style="display:flex;gap:.4rem;justify-content:flex-end;align-items:center">
+                <span style="color:var(--sage);font-size:.75rem;display:inline-block;transform:rotate(${isOpen?'180':'0'}deg);transition:transform .2s">▾</span>
+                <button class="adm-btn adm-btn-sm adm-btn-danger exp-del" data-del="${e.id}" style="padding:.2rem .5rem;font-size:.65rem">✕</button>
+              </div>
+            </div>
+            ${isOpen?`<div style="background:rgba(0,0,0,.2);padding:1rem 1.2rem">
+              <div style="font-size:.52rem;letter-spacing:.14em;text-transform:uppercase;color:var(--sage);margin-bottom:.7rem">Histórico de pagamentos</div>
+              ${e.payments.length>0?`<div style="margin-bottom:1rem">${e.payments.map(p=>`
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:.35rem 0;border-bottom:1px solid rgba(201,168,76,.06)">
+                  <div><span style="color:var(--cream);font-size:.8rem;font-weight:600">${fmt(p.amount)}</span>${p.note?`<span style="color:var(--sage);font-size:.65rem;margin-left:.7rem">${esc(p.note)}</span>`:''}</div>
+                  <span style="color:var(--sage);font-size:.6rem">${p.date?new Date(p.date).toLocaleDateString('pt-BR'):''}</span>
+                </div>`).join('')}</div>`:`<p style="color:var(--sage);font-size:.75rem;margin-bottom:1rem;opacity:.7">Nenhum pagamento registrado ainda.</p>`}
+              ${e.remaining>0?`<div style="display:flex;gap:.8rem;align-items:flex-end;flex-wrap:wrap;padding-top:.5rem">
+                <div style="flex:0 0 130px"><label class="adm-label">Valor (R$)</label><input class="adm-input" id="pay-amt-${e.id}" type="number" placeholder="0,00" min="0.01" max="${e.remaining}" step="0.01"></div>
+                <div style="flex:1;min-width:140px"><label class="adm-label">Observação (opcional)</label><input class="adm-input" id="pay-note-${e.id}" placeholder="Ex: Sinal, Parcela 2…"></div>
+                <button class="adm-btn exp-pay" data-pay="${e.id}" data-remaining="${e.remaining}">✓ Registrar</button>
+              </div>`:`<div style="color:#7DC98A;font-size:.78rem;padding:.6rem;background:rgba(125,201,138,.08);border-radius:6px;text-align:center">✓ Totalmente quitado</div>`}
+            </div>`:''}
+          </div>`;}).join('')}
+      </div>`:`<div style="text-align:center;padding:2rem;color:var(--sage);font-size:.82rem">Nenhum gasto cadastrado ainda. Adicione o primeiro acima.</div>`}`;
+    // Add
     document.getElementById('add-exp').addEventListener('click',async()=>{
       const desc=document.getElementById('e-desc').value.trim();
       const cat=document.getElementById('e-cat').value;
       const amt=parseFloat(document.getElementById('e-amt').value);
-      const paid=document.getElementById('e-paid').checked;
       if(!desc||isNaN(amt)||amt<=0){alert('Preencha descrição e valor.');return;}
-      await db.collection('expenses').add({description:desc,category:cat,amount:amt,paid,createdAt:Date.now()});
-      document.getElementById('e-desc').value='';document.getElementById('e-amt').value='';document.getElementById('e-paid').checked=false;
+      await db.collection('expenses').add({description:desc,category:cat,totalAmount:amt,payments:[],createdAt:Date.now()});
+      document.getElementById('e-desc').value='';document.getElementById('e-amt').value='';
     });
-    pane.querySelectorAll('[data-del]').forEach(btn=>{
+    // Toggle expand
+    pane.querySelectorAll('.exp-hdr').forEach(hdr=>{
+      hdr.addEventListener('click',ev=>{
+        if(ev.target.closest('.exp-del'))return;
+        const id=hdr.closest('.exp-item').dataset.id;
+        expanded=expanded===id?null:id;
+        render(lastExps);
+      });
+    });
+    // Delete
+    pane.querySelectorAll('.exp-del').forEach(btn=>{
       let t=null;
-      btn.addEventListener('click',async()=>{
+      btn.addEventListener('click',async ev=>{
+        ev.stopPropagation();
         if(btn.dataset.c==='1'){clearTimeout(t);btn.disabled=true;await db.collection('expenses').doc(btn.dataset.del).delete();}
         else{btn.dataset.c='1';btn.textContent='✓?';btn.style.background='rgba(201,168,76,.3)';t=setTimeout(()=>{btn.dataset.c='';btn.textContent='✕';btn.style.background='';},2500);}
       });
     });
+    // Register payment
+    pane.querySelectorAll('.exp-pay').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const id=btn.dataset.pay;
+        const rem=parseFloat(btn.dataset.remaining);
+        const amtEl=document.getElementById('pay-amt-'+id);
+        const noteEl=document.getElementById('pay-note-'+id);
+        const amt=parseFloat(amtEl.value);
+        if(isNaN(amt)||amt<=0||amt>rem+0.01){alert('Valor inválido. Restante: '+fmt(rem));return;}
+        const note=noteEl.value.trim();
+        const exp=exps.find(e=>e.id===id);
+        const payments=[...(exp.payments||[]),{amount:amt,date:Date.now(),note}];
+        btn.textContent='Salvando…';btn.disabled=true;
+        await db.collection('expenses').doc(id).update({payments});
+      });
+    });
+  }
+  db.collection('expenses').onSnapshot(snap=>{
+    render(snap.docs.map(d=>({id:d.id,...d.data()})));
   });
 }
 
