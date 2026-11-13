@@ -1131,7 +1131,7 @@ if(db){
     const photos=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>a.order-b.order);
     if(photos.length===0){galEl.innerHTML='';return;}
     document.querySelector('.gal-count').textContent=photos.length+' foto'+(photos.length>1?'s':'');
-    galEl.innerHTML=photos.map(p=>`<div class="gal-item"><img src="${p.url}" alt="${esc(p.caption||'')}" style="width:100%;height:100%;object-fit:cover"></div>`).join('');
+    galEl.innerHTML=photos.map(p=>`<div class="gal-item"><img src="${p.url}" alt="${esc(p.caption||'')}" style="width:100%;height:100%;object-fit:${p.fit||'cover'};object-position:${p.position||'center'}"></div>`).join('');
   });
 }
 
@@ -1385,6 +1385,8 @@ function loadGuests(){
 /* ---- TAB: FOTOS ---- */
 function loadPhotos(){
   const pane=document.getElementById('pane-photos');
+  const posVals=['top left','top center','top right','center left','center','center right','bottom left','bottom center','bottom right'];
+  const posIcons=['↖','↑','↗','←','⊙','→','↙','↓','↘'];
   function render(photos){
     pane.innerHTML=`
       <h2 class="adm-title">Galeria de Fotos</h2>
@@ -1392,40 +1394,97 @@ function loadPhotos(){
         <input type="file" id="photoInput" accept="image/*" multiple style="display:none" ${assets?'':'disabled'}>
         <div style="color:var(--sage);font-size:.88rem">
           <div style="font-size:2rem;margin-bottom:.6rem">📷</div>
-          ${assets?'Clique aqui ou arraste as fotos (JPG, PNG, WebP)':'Upload de fotos não disponível neste plano.'}
+          ${assets?'Clique aqui ou arraste as fotos (JPG, PNG, WebP)':'Upload indisponível.'}
         </div>
       </label>
-      ${photos.length>0?`<div class="adm-photo-grid" id="photoGrid">${photos.map(p=>`
-        <div class="adm-photo-item">
-          <img src="${esc(p.url)}" alt="">
-          <button class="adm-photo-del" data-del="${p.id}" data-asset="${esc(p.assetId)}">✕</button>
-        </div>`).join('')}</div>`:'<p style="color:var(--sage);font-size:.82rem">Nenhuma foto ainda.</p>'}`;
+      ${photos.length>0?`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1rem;margin-top:1rem">${photos.map((p,i)=>{
+        const fit=p.fit||'cover';const pos=p.position||'center';
+        return`<div class="adm-card" style="padding:.75rem">
+          <div style="aspect-ratio:4/3;overflow:hidden;border-radius:6px;margin-bottom:.6rem;background:#0A1510">
+            <img src="${esc(p.url)}" style="width:100%;height:100%;object-fit:${fit};object-position:${pos}" alt="">
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+            <div style="display:flex;gap:.3rem;align-items:center">
+              <button class="adm-btn adm-btn-sm ph-up" data-id="${p.id}" data-prev="${i>0?photos[i-1].id:''}" data-oi="${p.order}" data-pi="${i>0?photos[i-1].order:''}" ${i===0?'disabled style="opacity:.3"':''}>↑</button>
+              <button class="adm-btn adm-btn-sm ph-dn" data-id="${p.id}" data-next="${i<photos.length-1?photos[i+1].id:''}" data-oi="${p.order}" data-ni="${i<photos.length-1?photos[i+1].order:''}" ${i===photos.length-1?'disabled style="opacity:.3"':''}>↓</button>
+              <span style="color:var(--sage);font-size:.58rem;padding:.15rem .4rem;background:rgba(255,255,255,.05);border-radius:3px">${i+1}°</span>
+            </div>
+            <button class="adm-btn adm-btn-sm adm-btn-danger ph-del" data-del="${p.id}" data-asset="${esc(p.assetId||'')}">✕</button>
+          </div>
+          <div style="display:flex;gap:.3rem;margin-bottom:.5rem">
+            <button class="adm-btn adm-btn-sm ph-fit ${fit==='cover'?'adm-btn-gold':''}" data-id="${p.id}" data-val="cover" style="flex:1;font-size:.58rem">Recortar</button>
+            <button class="adm-btn adm-btn-sm ph-fit ${fit==='contain'?'adm-btn-gold':''}" data-id="${p.id}" data-val="contain" style="flex:1;font-size:.58rem">Ver tudo</button>
+          </div>
+          ${fit==='cover'?`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-bottom:.5rem">
+            ${posVals.map((pv,pi)=>`<button class="adm-btn adm-btn-sm ph-pos" data-id="${p.id}" data-val="${pv}" style="font-size:.7rem;padding:.2rem;${pos===pv?'background:var(--gold);color:#050C07;':'opacity:.45'}">${posIcons[pi]}</button>`).join('')}
+          </div>`:'<div style="font-size:.6rem;color:var(--sage);text-align:center;margin-bottom:.5rem;opacity:.6">Exibindo imagem inteira</div>'}
+          <input class="adm-input" id="cap-${p.id}" value="${esc(p.caption||'')}" placeholder="Legenda (opcional)" style="font-size:.68rem;margin-bottom:.4rem">
+          <button class="adm-btn adm-btn-sm ph-cap" data-id="${p.id}" style="width:100%;font-size:.6rem">Salvar legenda</button>
+        </div>`;}).join('')}</div>`:'<p style="color:var(--sage);font-size:.82rem;margin-top:1rem">Nenhuma foto ainda.</p>'}`;
     if(assets){
       document.getElementById('photoInput').addEventListener('change',async e=>{
         const files=Array.from(e.target.files);
         const box=document.getElementById('upBox');
         for(const file of files){
           try{
-            box.style.borderColor='var(--gold)';
-            box.querySelector('div').textContent='Enviando…';
+            box.style.borderColor='var(--gold)';box.querySelector('div').textContent='Enviando…';
             const r=await assets.upload(file);
-            await db.collection('photos').add({assetId:r.id,url:r.url,caption:'',order:Date.now()});
-          }catch(err){console.error(err);}
+            await db.collection('photos').add({assetId:r.id,url:r.url,caption:'',fit:'cover',position:'center',order:Date.now()});
+          }catch(err){console.error('upload:',err);}
         }
       });
     }
-    pane.querySelectorAll('[data-del]').forEach(btn=>{
+    // ↑ move up — swap orders
+    pane.querySelectorAll('.ph-up').forEach(btn=>{
+      if(!btn.dataset.prev)return;
+      btn.addEventListener('click',async()=>{
+        const a=btn.dataset.id,b=btn.dataset.prev;
+        const oa=+btn.dataset.oi,ob=+btn.dataset.pi;
+        await Promise.all([db.collection('photos').doc(a).update({order:ob}),db.collection('photos').doc(b).update({order:oa})]);
+      });
+    });
+    // ↓ move down
+    pane.querySelectorAll('.ph-dn').forEach(btn=>{
+      if(!btn.dataset.next)return;
+      btn.addEventListener('click',async()=>{
+        const a=btn.dataset.id,b=btn.dataset.next;
+        const oa=+btn.dataset.oi,nb=+btn.dataset.ni;
+        await Promise.all([db.collection('photos').doc(a).update({order:nb}),db.collection('photos').doc(b).update({order:oa})]);
+      });
+    });
+    // Delete
+    pane.querySelectorAll('.ph-del').forEach(btn=>{
       let timer=null;
       btn.addEventListener('click',async()=>{
         if(btn.dataset.confirm==='1'){
-          clearTimeout(timer);
-          btn.textContent='…';btn.disabled=true;
-          try{if(assets)await assets.delete(btn.dataset.asset);}catch{}
+          clearTimeout(timer);btn.textContent='…';btn.disabled=true;
+          try{if(assets&&btn.dataset.asset)await assets.delete(btn.dataset.asset);}catch{}
           await db.collection('photos').doc(btn.dataset.del).delete();
-        } else {
+        }else{
           btn.dataset.confirm='1';btn.textContent='✓?';btn.style.background='rgba(201,168,76,.3)';
           timer=setTimeout(()=>{btn.dataset.confirm='';btn.textContent='✕';btn.style.background='';},2500);
         }
+      });
+    });
+    // Fit toggle
+    pane.querySelectorAll('.ph-fit').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        await db.collection('photos').doc(btn.dataset.id).update({fit:btn.dataset.val,position:'center'});
+      });
+    });
+    // Position
+    pane.querySelectorAll('.ph-pos').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        await db.collection('photos').doc(btn.dataset.id).update({position:btn.dataset.val});
+      });
+    });
+    // Caption
+    pane.querySelectorAll('.ph-cap').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const cap=document.getElementById('cap-'+btn.dataset.id).value.trim();
+        const orig=btn.textContent;btn.disabled=true;btn.textContent='Salvando…';
+        await db.collection('photos').doc(btn.dataset.id).update({caption:cap});
+        btn.disabled=false;btn.textContent=orig;
       });
     });
   }
