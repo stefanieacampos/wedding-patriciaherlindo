@@ -5,10 +5,9 @@ service cloud.firestore {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    // Usuário autenticado com custom claim admin=true
+    // Qualquer usuário autenticado no Firebase Auth é admin
     function isAdmin() {
-      return request.auth != null
-          && request.auth.token.admin == true;
+      return request.auth != null;
     }
 
     // Validação básica de string limpa

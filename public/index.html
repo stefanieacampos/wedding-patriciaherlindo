@@ -396,6 +396,7 @@ textarea.rf-input{resize:vertical;min-height:80px;font-family:var(--font-d)}
 
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-functions-compat.js"></script>
@@ -1145,47 +1146,19 @@ window.addEventListener('hashchange',()=>{if(location.hash==='#admin')openAdmin(
 
 /* ---- Helpers ---- */
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function getSess(){try{const s=JSON.parse(localStorage.getItem('ph_adm'));return s&&Date.now()-s.ts<86400000*7?s:null;}catch{return null;}}
-function setSess(e){try{localStorage.setItem('ph_adm',JSON.stringify({email:e,ts:Date.now()}));}catch{}}
-function clrSess(){try{localStorage.removeItem('ph_adm');}catch{}}
-async function hashPwd(p){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+'ph-bodas-pinho-2024'));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
+const _auth=firebase.auth();
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(+v||0);}
 
 async function initAdmin(){
   if(!db){renderPanel('<div class="adm-login"><div class="adm-login-box"><div class="adm-logo">Patricia &amp; Herlindo</div><div class="adm-logo-sub">Painel de Controle</div><p style="color:var(--sage);font-size:.82rem;text-align:center;line-height:1.8">Banco de dados indisponível.<br>Verifique sua conexão.</p></div></div>');return;}
-  const sess=getSess();if(sess){showDashboard();return;}
-  const cfg=await db.collection('admin').doc('config').get().catch(()=>null);
-  const users=cfg&&cfg.exists?(cfg.data().users||[]):[];
-  if(users.length===0)showSetup();
-  else showLogin();
+  renderPanel('<div class="adm-login"><div class="adm-login-box"><div class="adm-logo">Patricia &amp; Herlindo</div><div class="adm-logo-sub">Verificando sessão…</div></div></div>');
+  _auth.onAuthStateChanged(user=>{
+    if(user)showDashboard();
+    else showLogin();
+  });
 }
 
 function renderPanel(html){document.getElementById('adminPanel').innerHTML=html;}
-
-/* ---- SETUP (primeiro acesso) ---- */
-function showSetup(){
-  renderPanel(`<div class="adm-login"><div class="adm-login-box">
-    <div class="adm-logo">Patricia &amp; Herlindo</div>
-    <div class="adm-logo-sub">Configuração inicial · Painel de Controle</div>
-    <div class="adm-field"><label class="adm-label">Seu e-mail de acesso</label><input class="adm-input" id="su-em" type="email" placeholder="email@exemplo.com" autocomplete="email"></div>
-    <div class="adm-field"><label class="adm-label">Escolha uma senha</label><input class="adm-input" id="su-pw" type="password" placeholder="Mínimo 6 caracteres"></div>
-    <div class="adm-field"><label class="adm-label">Confirme a senha</label><input class="adm-input" id="su-pw2" type="password" placeholder="Repita a senha"></div>
-    <div class="adm-err" id="su-err"></div>
-    <button class="adm-btn adm-btn-full" id="su-btn">Criar conta e entrar</button>
-  </div></div>`);
-  document.getElementById('su-btn').addEventListener('click',async()=>{
-    const em=document.getElementById('su-em').value.trim(),pw=document.getElementById('su-pw').value,pw2=document.getElementById('su-pw2').value,err=document.getElementById('su-err');
-    if(!em||!pw){err.textContent='Preencha todos os campos.';return;}
-    if(pw!==pw2){err.textContent='As senhas não conferem.';return;}
-    if(pw.length<6){err.textContent='Senha mínima: 6 caracteres.';return;}
-    err.textContent='Criando…';
-    const hash=await hashPwd(pw);
-    try{
-      await db.collection('admin').doc('config').set({users:[{email:em,passwordHash:hash,createdAt:Date.now()}]});
-      setSess(em);showDashboard();
-    }catch(e){err.textContent='Erro ao salvar: '+e.message;}
-  });
-}
 
 /* ---- LOGIN ---- */
 function showLogin(){
@@ -1201,13 +1174,19 @@ function showLogin(){
     const em=document.getElementById('lg-em').value.trim(),pw=document.getElementById('lg-pw').value,err=document.getElementById('lg-err');
     if(!em||!pw){err.textContent='Preencha e-mail e senha.';return;}
     err.textContent='Verificando…';
-    const cfg=await db.collection('admin').doc('config').get().catch(()=>null);
-    if(!cfg||!cfg.exists){err.textContent='Conta não configurada.';return;}
-    const users=cfg.data().users||[];
-    const hash=await hashPwd(pw);
-    const match=users.find(u=>u.email===em&&u.passwordHash===hash);
-    if(!match){err.textContent='E-mail ou senha incorretos.';return;}
-    setSess(em);showDashboard();
+    try{
+      await _auth.signInWithEmailAndPassword(em,pw);
+      // onAuthStateChanged vai chamar showDashboard()
+    }catch(e){
+      const msgs={
+        'auth/user-not-found':'E-mail não cadastrado.',
+        'auth/wrong-password':'Senha incorreta.',
+        'auth/invalid-credential':'E-mail ou senha incorretos.',
+        'auth/too-many-requests':'Muitas tentativas. Aguarde e tente novamente.',
+        'auth/invalid-email':'E-mail inválido.'
+      };
+      err.textContent=msgs[e.code]||'Erro: '+e.message;
+    }
   };
   document.getElementById('lg-btn').addEventListener('click',go);
   document.getElementById('lg-pw').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
@@ -1273,7 +1252,7 @@ async function showDashboard(){
       </div>
     </div>
   </div>`);
-  document.getElementById('adm-logout').addEventListener('click',()=>{clrSess();showLogin();});
+  document.getElementById('adm-logout').addEventListener('click',()=>{_auth.signOut();});
   document.getElementById('adm-back').addEventListener('click',()=>{
     document.getElementById('adminPanel').style.display='none';
     document.body.style.overflow='';
@@ -1634,65 +1613,45 @@ function loadExpenses(){
 function loadUsers(){
   const pane=document.getElementById('pane-users');
   if(!pane)return;
-  async function render(){
-    const cfg=await db.collection('admin').doc('config').get().catch(()=>null);
-    const users=(cfg&&cfg.exists?cfg.data().users:[])||[];
-    pane.innerHTML=`
-      <div style="max-width:600px">
-        <div class="adm-card" style="margin-bottom:1.5rem">
-          <div class="adm-card-hd">Usuários com acesso ao painel (${users.length})</div>
-          ${users.length===0?'<p style="color:var(--sage);font-size:.82rem">Nenhum usuário cadastrado.</p>':''}
-          ${users.map((u,i)=>`
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:.7rem 0;border-bottom:1px solid rgba(201,168,76,.08)">
-              <div>
-                <div style="color:var(--cream);font-size:.82rem">${esc(u.email)}</div>
-                <div style="color:var(--sage);font-size:.6rem;letter-spacing:.08em;margin-top:.2rem">Cadastrado em ${u.createdAt?new Date(u.createdAt).toLocaleDateString('pt-BR'):'-'}</div>
-              </div>
-              ${users.length>1?`<button class="adm-btn-sm adm-btn" data-rm="${i}" style="background:rgba(220,50,50,.15);color:#ff6b6b;border:1px solid rgba(220,50,50,.3)">Remover</button>`:'<span style="font-size:.58rem;color:var(--sage);opacity:.5">único admin</span>'}
-            </div>`).join('')}
-        </div>
-        <div class="adm-card">
-          <div class="adm-card-hd">Adicionar novo usuário</div>
-          <div class="adm-field"><label class="adm-label">E-mail</label><input class="adm-input" id="nu-em" type="email" placeholder="email@exemplo.com"></div>
-          <div class="adm-field"><label class="adm-label">Senha</label><input class="adm-input" id="nu-pw" type="password" placeholder="Mínimo 6 caracteres"></div>
-          <div class="adm-field"><label class="adm-label">Confirme a senha</label><input class="adm-input" id="nu-pw2" type="password" placeholder="Repita a senha"></div>
-          <div class="adm-err" id="nu-err" style="margin-bottom:.8rem"></div>
-          <button class="adm-btn" id="nu-btn">Adicionar usuário</button>
-        </div>
-      </div>`;
-    // Remover usuário
-    pane.querySelectorAll('[data-rm]').forEach(btn=>{
-      btn.addEventListener('click',async()=>{
-        const idx=+btn.dataset.rm;
-        const updated=users.filter((_,i)=>i!==idx);
-        await db.collection('admin').doc('config').update({users:updated}).catch(e=>alert('Erro: '+e.message));
-        render();
-      });
-    });
-    // Adicionar usuário
-    document.getElementById('nu-btn').addEventListener('click',async()=>{
-      const em=document.getElementById('nu-em').value.trim();
-      const pw=document.getElementById('nu-pw').value;
-      const pw2=document.getElementById('nu-pw2').value;
-      const err=document.getElementById('nu-err');
-      if(!em||!pw){err.textContent='Preencha todos os campos.';return;}
-      if(pw!==pw2){err.textContent='As senhas não conferem.';return;}
-      if(pw.length<6){err.textContent='Senha mínima: 6 caracteres.';return;}
-      if(users.find(u=>u.email===em)){err.textContent='Este e-mail já tem acesso.';return;}
-      err.textContent='Salvando…';
-      const hash=await hashPwd(pw);
-      const updated=[...users,{email:em,passwordHash:hash,createdAt:Date.now()}];
-      try{
-        await db.collection('admin').doc('config').update({users:updated});
-        document.getElementById('nu-em').value='';
-        document.getElementById('nu-pw').value='';
-        document.getElementById('nu-pw2').value='';
-        err.textContent='';
-        render();
-      }catch(e){err.textContent='Erro: '+e.message;}
-    });
-  }
-  render();
+  const user=_auth.currentUser;
+  pane.innerHTML=`
+    <div style="max-width:600px">
+      <div class="adm-card" style="margin-bottom:1.5rem">
+        <div class="adm-card-hd">Conta ativa</div>
+        <div style="color:var(--cream);font-size:.85rem;margin-bottom:1.2rem">${esc(user?.email||'—')}</div>
+        <div class="adm-card-hd" style="margin-top:1rem">Alterar senha</div>
+        <div class="adm-field"><label class="adm-label">Nova senha</label><input class="adm-input" id="cp-pw" type="password" placeholder="Mínimo 6 caracteres"></div>
+        <div class="adm-field"><label class="adm-label">Confirme</label><input class="adm-input" id="cp-pw2" type="password" placeholder="Repita a senha"></div>
+        <div class="adm-err" id="cp-err" style="margin-bottom:.8rem"></div>
+        <button class="adm-btn" id="cp-btn">Atualizar senha</button>
+      </div>
+      <div class="adm-card">
+        <div class="adm-card-hd">Adicionar novos administradores</div>
+        <p style="color:var(--sage);font-size:.78rem;line-height:1.7;margin-bottom:1rem">Para adicionar outro usuário admin, acesse o <strong style="color:var(--gold-lt)">Firebase Console</strong> e crie o usuário lá:</p>
+        <a href="https://console.firebase.google.com/project/wedding-patriciaherlindo/authentication/users" target="_blank" class="adm-btn" style="display:inline-flex;text-decoration:none">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" style="margin-right:.5rem"><circle cx="10" cy="7" r="3"/><path d="M4 18c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+          Abrir Gerenciamento de Usuários
+        </a>
+        <p style="color:var(--sage);font-size:.68rem;margin-top:.8rem;opacity:.7">Clique em "Adicionar usuário" e informe o e-mail e senha. O novo usuário já terá acesso ao painel.</p>
+      </div>
+    </div>`;
+  document.getElementById('cp-btn').addEventListener('click',async()=>{
+    const pw=document.getElementById('cp-pw').value;
+    const pw2=document.getElementById('cp-pw2').value;
+    const err=document.getElementById('cp-err');
+    if(!pw){err.textContent='Digite a nova senha.';return;}
+    if(pw!==pw2){err.textContent='As senhas não conferem.';return;}
+    if(pw.length<6){err.textContent='Senha mínima: 6 caracteres.';return;}
+    err.textContent='Atualizando…';
+    try{
+      await _auth.currentUser.updatePassword(pw);
+      err.style.color='#82D494';err.textContent='Senha atualizada com sucesso!';
+      document.getElementById('cp-pw').value='';document.getElementById('cp-pw2').value='';
+    }catch(e){
+      err.style.color='';
+      err.textContent=e.code==='auth/requires-recent-login'?'Faça logout e login novamente antes de trocar a senha.':'Erro: '+e.message;
+    }
+  });
 }
 
 })();
