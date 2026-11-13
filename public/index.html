@@ -1135,6 +1135,10 @@ if(db){
   });
 }
 
+/* ---- Helpers ---- */
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+const _auth=firebase.auth();
+
 /* ---- Admin panel ---- */
 function openAdmin(){
   document.getElementById('adminPanel').style.display='flex';
@@ -1143,10 +1147,6 @@ function openAdmin(){
 }
 if(location.hash==='#admin')openAdmin();
 window.addEventListener('hashchange',()=>{if(location.hash==='#admin')openAdmin();});
-
-/* ---- Helpers ---- */
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-const _auth=firebase.auth();
 function fmt(v){return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(+v||0);}
 
 async function initAdmin(){
