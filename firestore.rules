@@ -78,6 +78,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── /admin/config ─────────────────────────────────────────────────────────
+    // Leitura pública (necessária para verificar se setup foi feito e validar login).
+    // Criação permitida somente na primeira vez (quando o doc não existe ainda).
+    // Atualização/exclusão bloqueadas no cliente — usar Firebase Console se necessário.
+    match /admin/config {
+      allow read:   if true;
+      allow create: if !exists(/databases/$(database)/documents/admin/config);
+      allow update, delete: if false;
+    }
+
     // ── Negação padrão ───────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
