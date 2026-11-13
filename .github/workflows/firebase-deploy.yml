@@ -33,4 +33,4 @@ jobs:
             --quiet || echo "Aviso: não foi possível conceder IAM (pode já existir)"
 
       - name: Deploy completo no Firebase
-        run: npx firebase-tools deploy --only hosting,firestore:rules --non-interactive --project wedding-patriciaherlindo
+        run: npx firebase-tools deploy --only hosting --non-interactive --project wedding-patriciaherlindo
